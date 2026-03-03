@@ -6,10 +6,14 @@ from app.routers import auth, importer, inventory, orders, products, prom, r2
 
 app = FastAPI(title=settings.app_name)
 
+allowed_origins = [origin.strip() for origin in settings.cors_origin.split(',') if origin.strip()]
+if not allowed_origins:
+    allowed_origins = ['*']
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.cors_origin] if settings.cors_origin != '*' else ['*'],
-    allow_credentials=True,
+    allow_origins=allowed_origins,
+    allow_credentials=False,
     allow_methods=['*'],
     allow_headers=['*'],
 )
