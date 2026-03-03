@@ -41,7 +41,6 @@ def upgrade() -> None:
     op.create_index('ix_products_name', 'products', ['name'])
 
     movement_type_enum = sa.Enum('IN', 'OUT', 'ADJUST', name='movementtype')
-    movement_type_enum.create(op.get_bind(), checkfirst=True)
 
     op.create_table(
         'inventory_movements',
@@ -64,7 +63,6 @@ def downgrade() -> None:
     op.drop_table('inventory_movements')
 
     movement_type_enum = sa.Enum('IN', 'OUT', 'ADJUST', name='movementtype')
-    movement_type_enum.drop(op.get_bind(), checkfirst=True)
 
     op.drop_index('ix_products_name', table_name='products')
     op.drop_index('ix_products_prom_uid', table_name='products')
