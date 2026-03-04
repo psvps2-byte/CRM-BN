@@ -37,7 +37,8 @@ def _pick(data: dict[str, Any], keys: list[str], fallback: Any = None) -> Any:
 def sync_products_from_prom(db: Session) -> int:
     remote_products = fetch_all(settings.prom_products_endpoint, ['products', 'product_list'])
 
-    synced = 0
+    # Prom can return duplicate product IDs in one response. Keep only the latest row per UID.
+    normalized_products: dict[str, dict[str, Any]] = {}
     for item in remote_products:
         prom_uid = _pick(item, ['id', 'prom_uid', 'uid', 'external_id'])
         if prom_uid is None:
@@ -46,25 +47,35 @@ def sync_products_from_prom(db: Session) -> int:
         if not prom_uid:
             continue
 
-        name = str(_pick(item, ['name', 'title'], prom_uid)).strip()
-        price = _to_decimal(_pick(item, ['price', 'price_selling', 'price_with_discount'], 0))
-        qty = _to_int(_pick(item, ['quantity_in_stock', 'quantity', 'stock'], 0))
-        availability = str(_pick(item, ['presence', 'status', 'availability'], 'available')).strip() or 'available'
+        normalized_products[prom_uid] = {
+            'name': str(_pick(item, ['name', 'title'], prom_uid)).strip(),
+            'price': _to_decimal(_pick(item, ['price', 'price_selling', 'price_with_discount'], 0)),
+            'qty': max(0, _to_int(_pick(item, ['quantity_in_stock', 'quantity', 'stock'], 0))),
+            'availability': str(_pick(item, ['presence', 'status', 'availability'], 'available')).strip() or 'available',
+        }
 
-        product = db.scalar(select(Product).where(Product.prom_uid == prom_uid))
+    if not normalized_products:
+        return 0
+
+    existing_products = db.scalars(select(Product).where(Product.prom_uid.in_(list(normalized_products.keys())))).all()
+    existing_by_uid = {product.prom_uid: product for product in existing_products}
+
+    synced = 0
+    for prom_uid, payload in normalized_products.items():
+        product = existing_by_uid.get(prom_uid)
         if product:
-            product.name = name or product.name
-            product.price = price
-            product.qty = max(0, qty)
-            product.availability = availability
+            product.name = payload['name'] or product.name
+            product.price = payload['price']
+            product.qty = payload['qty']
+            product.availability = payload['availability']
         else:
             db.add(
                 Product(
                     prom_uid=prom_uid,
-                    name=name or prom_uid,
-                    price=price,
-                    qty=max(0, qty),
-                    availability=availability,
+                    name=payload['name'] or prom_uid,
+                    price=payload['price'],
+                    qty=payload['qty'],
+                    availability=payload['availability'],
                 )
             )
         synced += 1
