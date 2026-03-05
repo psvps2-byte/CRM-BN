@@ -29,6 +29,22 @@ def _extract_items(payload: Any, preferred_keys: list[str]) -> list[dict[str, An
     return []
 
 
+def _extract_cursor(payload: Any) -> str | None:
+    if not isinstance(payload, dict):
+        return None
+    for key in ['last_id', 'next_last_id', 'next_id', 'cursor', 'next_cursor']:
+        value = payload.get(key)
+        if value not in (None, ''):
+            return str(value)
+    pagination = payload.get('pagination')
+    if isinstance(pagination, dict):
+        for key in ['last_id', 'next_last_id', 'next_id', 'cursor', 'next_cursor']:
+            value = pagination.get(key)
+            if value not in (None, ''):
+                return str(value)
+    return None
+
+
 def fetch_all(path: str, item_keys: list[str]) -> list[dict[str, Any]]:
     _validate_config()
 
@@ -40,8 +56,18 @@ def fetch_all(path: str, item_keys: list[str]) -> list[dict[str, Any]]:
     all_items: list[dict[str, Any]] = []
 
     with httpx.Client(timeout=30.0) as client:
-        for page in range(1, settings.prom_max_pages + 1):
-            params = {'page': page, 'limit': settings.prom_page_size}
+        cursor: str | None = None
+        page = 1
+        previous_signature: tuple[str, ...] | None = None
+
+        for _ in range(settings.prom_max_pages):
+            params: dict[str, Any] = {'limit': settings.prom_page_size}
+            # Prom often uses cursor-based pagination via last_id.
+            if cursor:
+                params['last_id'] = cursor
+            else:
+                params['page'] = page
+
             response = client.get(url, headers=headers, params=params)
             if response.status_code >= 400:
                 detail = f'Prom API error {response.status_code}'
@@ -58,8 +84,21 @@ def fetch_all(path: str, item_keys: list[str]) -> list[dict[str, Any]]:
             if not items:
                 break
 
+            signature = tuple(str(item.get('id') or item.get('prom_uid') or item.get('uid') or '') for item in items[:5])
+            if previous_signature is not None and signature == previous_signature and not cursor:
+                # Pagination params are likely ignored by upstream API, avoid infinite duplicates.
+                break
+            previous_signature = signature
+
             all_items.extend(items)
+
+            next_cursor = _extract_cursor(payload)
+            if next_cursor and next_cursor != cursor:
+                cursor = next_cursor
+                continue
+
             if len(items) < settings.prom_page_size:
                 break
+            page += 1
 
     return all_items
