@@ -1,9 +1,9 @@
 'use client';
 
-import Link from 'next/link';
-import { FormEvent, useEffect, useState } from 'react';
+import CrmSidebar from '@/components/crm-sidebar';
 import { apiFetch, requireAuth } from '@/lib/api';
 import { useRouter } from 'next/navigation';
+import { FormEvent, useEffect, useState } from 'react';
 
 type Movement = {
   id: number;
@@ -66,15 +66,11 @@ export default function InventoryPage() {
   };
 
   return (
-    <main className="container">
-      <div className="card">
+    <main className="crm-layout">
+      <CrmSidebar />
+
+      <section className="crm-content card">
         <h1>Склад</h1>
-        <nav>
-          <Link href="/products">Товари</Link>
-          <Link href="/inventory">Склад</Link>
-          <Link href="/orders">Замовлення</Link>
-          <Link href="/login">Логін</Link>
-        </nav>
 
         <form className="card" onSubmit={submit} style={{ marginBottom: 16 }}>
           <h3>Новий рух</h3>
@@ -136,7 +132,7 @@ export default function InventoryPage() {
             </tbody>
           </table>
         )}
-      </div>
+      </section>
     </main>
   );
 }

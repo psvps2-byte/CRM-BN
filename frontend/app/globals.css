@@ -19,6 +19,60 @@ body {
   color: var(--text);
 }
 
+.crm-layout {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 240px 1fr;
+}
+
+.crm-sidebar {
+  border-right: 1px solid #9ec7e8;
+  background: #e9f3fb;
+  padding: 12px 0;
+}
+
+.crm-brand {
+  padding: 8px 14px 14px;
+  font-size: 36px;
+  line-height: 1;
+  color: #2f6ca0;
+  border-bottom: 1px solid #bcd8ed;
+  font-family: 'Times New Roman', serif;
+}
+
+.crm-section-title {
+  padding: 10px 14px 6px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.crm-menu {
+  margin: 0;
+  display: block;
+}
+
+.crm-menu-link {
+  display: block;
+  padding: 8px 14px;
+  text-decoration: none;
+  color: #245e95;
+  border-top: 1px solid #d3e6f5;
+  border-bottom: 1px solid #d3e6f5;
+  margin-bottom: -1px;
+  background: #e9f3fb;
+}
+
+.crm-menu-link.active {
+  background: #d2e8f8;
+  color: #1d4f7d;
+  font-weight: 600;
+}
+
+.crm-content {
+  margin: 20px;
+  align-self: start;
+}
+
 .container {
   max-width: 1200px;
   margin: 0 auto;
@@ -91,6 +145,27 @@ nav {
 }
 
 @media (max-width: 768px) {
+  .crm-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .crm-sidebar {
+    border-right: none;
+    border-bottom: 1px solid #9ec7e8;
+  }
+
+  .crm-brand {
+    font-size: 28px;
+  }
+
+  .crm-menu-link {
+    padding: 10px 12px;
+  }
+
+  .crm-content {
+    margin: 12px;
+  }
+
   .container {
     padding: 12px;
   }

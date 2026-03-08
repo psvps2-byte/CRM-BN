@@ -1,9 +1,9 @@
 'use client';
 
-import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import CrmSidebar from '@/components/crm-sidebar';
 import { apiFetch, requireAuth } from '@/lib/api';
 import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 
 type OrderItem = {
   id: number;
@@ -60,19 +60,17 @@ export default function OrdersPage() {
   }, []);
 
   return (
-    <main className="container">
-      <div className="card">
+    <main className="crm-layout">
+      <CrmSidebar />
+
+      <section className="crm-content card">
         <h1>Замовлення</h1>
-        <nav>
-          <Link href="/products">Товари</Link>
-          <Link href="/inventory">Склад</Link>
-          <Link href="/orders">Замовлення</Link>
-          <Link href="/login">Логін</Link>
-        </nav>
 
         <div className="row" style={{ marginBottom: 16 }}>
           <button onClick={syncOrders}>Синхронізувати замовлення з Prom</button>
-          <button className="secondary" onClick={load}>Оновити список</button>
+          <button className="secondary" onClick={load}>
+            Оновити список
+          </button>
         </div>
 
         {error && <p className="error">{error}</p>}
@@ -111,7 +109,7 @@ export default function OrdersPage() {
             </tbody>
           </table>
         )}
-      </div>
+      </section>
     </main>
   );
 }

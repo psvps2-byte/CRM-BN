@@ -1,9 +1,9 @@
 'use client';
 
-import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import CrmSidebar from '@/components/crm-sidebar';
 import { apiFetch, requireAuth } from '@/lib/api';
 import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 
 type Product = {
   id: number;
@@ -61,34 +61,43 @@ export default function ProductsPage() {
   const pages = Math.max(1, Math.ceil(total / perPage));
 
   return (
-    <main className="container">
-      <div className="card">
+    <main className="crm-layout">
+      <CrmSidebar />
+
+      <section className="crm-content card">
         <h1>Товари</h1>
-        <nav>
-          <Link href="/products">Товари</Link>
-          <Link href="/inventory">Склад</Link>
-          <Link href="/orders">Замовлення</Link>
-          <Link href="/login">Логін</Link>
-        </nav>
 
         <div className="row" style={{ marginBottom: 12 }}>
-          <button onClick={async () => {
-            setError("");
-            try {
-              await apiFetch("/prom/sync/products", { method: "POST" });
-              await load();
-            } catch (err) {
-              setError(err instanceof Error ? err.message : "Sync failed");
-            }
-          }}>Синхронізувати з Prom</button>
-          <button className="secondary" onClick={() => load()}>Оновити</button>
+          <button
+            onClick={async () => {
+              setError('');
+              try {
+                await apiFetch('/prom/sync/products', { method: 'POST' });
+                await load();
+              } catch (err) {
+                setError(err instanceof Error ? err.message : 'Sync failed');
+              }
+            }}
+          >
+            Синхронізувати з Prom
+          </button>
+          <button className="secondary" onClick={() => load()}>
+            Оновити
+          </button>
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Пошук по назві або UID"
             style={{ minWidth: 260 }}
           />
-          <button onClick={() => { setPage(1); load(); }}>Шукати</button>
+          <button
+            onClick={() => {
+              setPage(1);
+              load();
+            }}
+          >
+            Шукати
+          </button>
         </div>
 
         {error && <p className="error">{error}</p>}
@@ -120,7 +129,9 @@ export default function ProductsPage() {
                       type="number"
                       min={0}
                       value={p.price}
-                      onChange={(e) => setItems((prev) => prev.map((x) => (x.id === p.id ? { ...x, price: Number(e.target.value) } : x)))}
+                      onChange={(e) =>
+                        setItems((prev) => prev.map((x) => (x.id === p.id ? { ...x, price: Number(e.target.value) } : x)))
+                      }
                       style={{ width: 90 }}
                     />
                   </td>
@@ -129,7 +140,9 @@ export default function ProductsPage() {
                       type="number"
                       min={0}
                       value={p.qty}
-                      onChange={(e) => setItems((prev) => prev.map((x) => (x.id === p.id ? { ...x, qty: Number(e.target.value) } : x)))}
+                      onChange={(e) =>
+                        setItems((prev) => prev.map((x) => (x.id === p.id ? { ...x, qty: Number(e.target.value) } : x)))
+                      }
                       style={{ width: 80 }}
                     />
                   </td>
@@ -165,7 +178,7 @@ export default function ProductsPage() {
             Вперед
           </button>
         </div>
-      </div>
+      </section>
     </main>
   );
 }
