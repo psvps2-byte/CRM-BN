@@ -34,6 +34,31 @@ def _pick(data: dict[str, Any], keys: list[str], fallback: Any = None) -> Any:
     return fallback
 
 
+def _normalize_attributes(value: Any) -> dict[str, str] | None:
+    if isinstance(value, dict):
+        result = {str(key).strip(): str(item).strip() for key, item in value.items() if str(key).strip()}
+        return result or None
+    if isinstance(value, list):
+        result: dict[str, str] = {}
+        for item in value:
+            if isinstance(item, dict):
+                name = str(_pick(item, ['name', 'title', 'key'], '')).strip()
+                attr_value = str(_pick(item, ['value', 'text'], '')).strip()
+                if name:
+                    result[name] = attr_value
+        return result or None
+    return None
+
+
+def _normalize_image_urls(value: Any) -> list[str] | None:
+    if isinstance(value, list):
+        urls = [str(item).strip() for item in value if str(item).strip()]
+        return urls or None
+    if isinstance(value, str) and value.strip():
+        return [value.strip()]
+    return None
+
+
 def sync_products_from_prom(db: Session) -> int:
     remote_products = fetch_all(settings.prom_products_endpoint, ['products', 'product_list'])
 
@@ -52,6 +77,10 @@ def sync_products_from_prom(db: Session) -> int:
             'price': _to_decimal(_pick(item, ['price', 'price_selling', 'price_with_discount'], 0)),
             'qty': max(0, _to_int(_pick(item, ['quantity_in_stock', 'quantity', 'stock'], 0))),
             'availability': str(_pick(item, ['presence', 'status', 'availability'], 'available')).strip() or 'available',
+            'slug': str(_pick(item, ['url', 'slug'], '')).strip() or None,
+            'description': str(_pick(item, ['description', 'content', 'short_description'], '')).strip() or None,
+            'attributes': _normalize_attributes(_pick(item, ['attributes', 'characteristics'], None)),
+            'image_urls': _normalize_image_urls(_pick(item, ['images', 'photos', 'image'], None)),
         }
 
     if not normalized_products:
@@ -68,6 +97,14 @@ def sync_products_from_prom(db: Session) -> int:
             product.price = payload['price']
             product.qty = payload['qty']
             product.availability = payload['availability']
+            if payload['slug']:
+                product.slug = payload['slug']
+            if payload['description']:
+                product.description = payload['description']
+            if payload['attributes']:
+                product.attributes = payload['attributes']
+            if payload['image_urls']:
+                product.image_urls = payload['image_urls']
         else:
             db.add(
                 Product(
@@ -76,6 +113,10 @@ def sync_products_from_prom(db: Session) -> int:
                     price=payload['price'],
                     qty=payload['qty'],
                     availability=payload['availability'],
+                    slug=payload['slug'],
+                    description=payload['description'],
+                    attributes=payload['attributes'],
+                    image_urls=payload['image_urls'],
                 )
             )
         synced += 1

@@ -43,6 +43,10 @@ def list_products(
             availability=product.availability,
             group_id=product.group_id,
             group_name=group_name,
+            slug=product.slug,
+            description=product.description,
+            attributes=product.attributes,
+            image_urls=product.image_urls,
         )
         for product, group_name in rows
     ]
@@ -55,9 +59,25 @@ def update_product(product_id: int, payload: ProductUpdate, db: Session = Depend
     if not product:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Product not found')
 
-    product.price = payload.price
-    product.qty = payload.qty
-    product.availability = payload.availability
+    changes = payload.model_dump(exclude_unset=True)
+
+    if 'name' in changes:
+        product.name = payload.name or product.name
+    if 'price' in changes and payload.price is not None:
+        product.price = payload.price
+    if 'qty' in changes and payload.qty is not None:
+        product.qty = payload.qty
+    if 'availability' in changes and payload.availability is not None:
+        product.availability = payload.availability
+    if 'slug' in changes:
+        product.slug = payload.slug or None
+    if 'description' in changes:
+        product.description = payload.description or None
+    if 'attributes' in changes:
+        product.attributes = payload.attributes
+    if 'image_urls' in changes:
+        product.image_urls = payload.image_urls
+
     db.commit()
     db.refresh(product)
 
@@ -75,4 +95,8 @@ def update_product(product_id: int, payload: ProductUpdate, db: Session = Depend
         availability=product.availability,
         group_id=product.group_id,
         group_name=group_name,
+        slug=product.slug,
+        description=product.description,
+        attributes=product.attributes,
+        image_urls=product.image_urls,
     )

@@ -22,6 +22,10 @@ class ProductBase(BaseModel):
     qty: int
     availability: str
     group_id: int | None = None
+    slug: str | None = None
+    description: str | None = None
+    attributes: dict[str, str] | None = None
+    image_urls: list[str] | None = None
 
 
 class ProductOut(ProductBase):
@@ -33,9 +37,14 @@ class ProductOut(ProductBase):
 
 
 class ProductUpdate(BaseModel):
-    price: float = Field(ge=0)
-    qty: int = Field(ge=0)
-    availability: str = Field(min_length=1, max_length=64)
+    name: str | None = Field(default=None, min_length=1, max_length=1024)
+    price: float | None = Field(default=None, ge=0)
+    qty: int | None = Field(default=None, ge=0)
+    availability: str | None = Field(default=None, min_length=1, max_length=64)
+    slug: str | None = Field(default=None, max_length=1024)
+    description: str | None = None
+    attributes: dict[str, str] | None = None
+    image_urls: list[str] | None = None
 
 
 class ProductListResponse(BaseModel):

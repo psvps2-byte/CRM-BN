@@ -114,6 +114,11 @@ button.secondary {
   color: #111827;
 }
 
+button.small-btn {
+  padding: 4px 9px;
+  border-radius: 6px;
+}
+
 button.danger {
   background: var(--danger);
 }
@@ -144,6 +149,139 @@ nav {
   color: var(--muted);
 }
 
+.products-shell {
+  background: #eef4fb;
+  border-color: #b7cde3;
+}
+
+.products-workspace {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 14px;
+  min-height: 520px;
+}
+
+.catalog-panel {
+  border: 1px solid #b9cde2;
+  background: #f7fbff;
+  border-radius: 8px;
+  overflow: auto;
+}
+
+.catalog-panel-title {
+  background: #4c86e4;
+  color: #fff;
+  padding: 8px 10px;
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.catalog-list {
+  list-style: none;
+  margin: 0;
+  padding: 8px;
+}
+
+.catalog-list li {
+  margin-bottom: 2px;
+}
+
+.catalog-link {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  color: #1f4f8a;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  padding: 6px 8px;
+}
+
+.catalog-link:hover {
+  background: #ebf3ff;
+}
+
+.catalog-link.active {
+  background: #dbeafe;
+  border-color: #a6c8ff;
+  color: #1e3a8a;
+  font-weight: 600;
+}
+
+.products-table-shell {
+  border: 1px solid #b9cde2;
+  border-radius: 8px;
+  background: #fff;
+  overflow: auto;
+}
+
+.products-table th {
+  background: #f4f7fc;
+  border-bottom: 1px solid #c7d4e5;
+  color: #334155;
+}
+
+.products-table td {
+  border-bottom: 1px solid #e3e8ef;
+}
+
+.products-table tr:hover td {
+  background: #f9fcff;
+}
+
+.product-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(29, 51, 83, 0.35);
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  z-index: 1000;
+}
+
+.product-modal-card {
+  width: min(840px, 100%);
+  max-height: 92vh;
+  overflow: auto;
+  border: 1px solid #abc4de;
+  border-radius: 10px;
+  background: #f4f8fd;
+  padding: 12px;
+}
+
+.product-modal-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.product-form-grid {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: 8px 10px;
+}
+
+.product-form-grid label {
+  align-self: center;
+  color: #334155;
+}
+
+.product-form-grid input,
+.product-form-grid select {
+  border-radius: 6px;
+  border: 1px solid #bccbde;
+  background: #fff;
+}
+
+.product-modal-note {
+  margin-top: 14px;
+  border: 1px solid #cbd8e9;
+  border-radius: 8px;
+  padding: 10px;
+  background: #ffffff;
+}
+
 @media (max-width: 768px) {
   .crm-layout {
     grid-template-columns: 1fr;
@@ -168,5 +306,13 @@ nav {
 
   .container {
     padding: 12px;
+  }
+
+  .products-workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .product-form-grid {
+    grid-template-columns: 1fr;
   }
 }
