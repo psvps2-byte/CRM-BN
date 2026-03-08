@@ -45,6 +45,14 @@ def _extract_cursor(payload: Any) -> str | None:
     return None
 
 
+def _extract_item_id(item: dict[str, Any]) -> str | None:
+    for key in ['id', 'prom_uid', 'uid', 'external_id']:
+        value = item.get(key)
+        if value not in (None, ''):
+            return str(value)
+    return None
+
+
 def fetch_all(path: str, item_keys: list[str]) -> list[dict[str, Any]]:
     _validate_config()
 
@@ -59,12 +67,14 @@ def fetch_all(path: str, item_keys: list[str]) -> list[dict[str, Any]]:
         cursor: str | None = None
         page = 1
         previous_signature: tuple[str, ...] | None = None
+        seen_cursors: set[str] = set()
 
         for _ in range(settings.prom_max_pages):
-            params: dict[str, Any] = {'limit': settings.prom_page_size}
+            params: dict[str, Any] = {'limit': settings.prom_page_size, 'per_page': settings.prom_page_size}
             # Prom often uses cursor-based pagination via last_id.
             if cursor:
                 params['last_id'] = cursor
+                params['from_id'] = cursor
             else:
                 params['page'] = page
 
@@ -93,7 +103,14 @@ def fetch_all(path: str, item_keys: list[str]) -> list[dict[str, Any]]:
             all_items.extend(items)
 
             next_cursor = _extract_cursor(payload)
-            if next_cursor and next_cursor != cursor:
+            if not next_cursor and items:
+                # Some Prom endpoints do not return pagination metadata; derive cursor from last item id.
+                derived = _extract_item_id(items[-1])
+                if derived and derived != cursor:
+                    next_cursor = derived
+
+            if next_cursor and next_cursor != cursor and next_cursor not in seen_cursors:
+                seen_cursors.add(next_cursor)
                 cursor = next_cursor
                 continue
 
