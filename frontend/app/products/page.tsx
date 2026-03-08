@@ -47,14 +47,29 @@ function parseAttributes(input: string) {
 
 function formatImageUrls(urls?: string[] | null) {
   if (!urls?.length) return '';
-  return urls.join('\n');
+  const extracted = urls
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const quotedMatch = line.match(/['"]url['"]\s*:\s*['"]([^'"]+)['"]/i);
+      if (quotedMatch?.[1]) return quotedMatch[1];
+      const directMatch = line.match(/https?:\/\/\S+/i);
+      return directMatch?.[0] || line;
+    });
+  return extracted.join('\n');
 }
 
 function parseImageUrls(input: string) {
   const rows = input
     .split('\n')
     .map((line) => line.trim())
-    .filter(Boolean);
+    .filter(Boolean)
+    .map((line) => {
+      const quotedMatch = line.match(/['"]url['"]\s*:\s*['"]([^'"]+)['"]/i);
+      if (quotedMatch?.[1]) return quotedMatch[1];
+      const directMatch = line.match(/https?:\/\/\S+/i);
+      return directMatch?.[0] || line;
+    });
   return rows.length ? rows : null;
 }
 

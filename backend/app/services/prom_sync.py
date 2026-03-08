@@ -52,8 +52,20 @@ def _normalize_attributes(value: Any) -> dict[str, str] | None:
 
 def _normalize_image_urls(value: Any) -> list[str] | None:
     if isinstance(value, list):
-        urls = [str(item).strip() for item in value if str(item).strip()]
+        urls: list[str] = []
+        for item in value:
+            if isinstance(item, dict):
+                url = str(_pick(item, ['url', 'thumbnail_url', 'src', 'href'], '')).strip()
+                if url:
+                    urls.append(url)
+                continue
+            raw = str(item).strip()
+            if raw:
+                urls.append(raw)
         return urls or None
+    if isinstance(value, dict):
+        url = str(_pick(value, ['url', 'thumbnail_url', 'src', 'href'], '')).strip()
+        return [url] if url else None
     if isinstance(value, str) and value.strip():
         return [value.strip()]
     return None
