@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from typing import Any
 
 import httpx
@@ -46,14 +47,19 @@ def _extract_cursor(payload: Any) -> str | None:
 
 
 def _extract_item_id(item: dict[str, Any]) -> str | None:
-    for key in ['id', 'prom_uid', 'uid', 'external_id']:
+    for key in ['id', 'order_id', 'number', 'prom_uid', 'uid', 'external_id']:
         value = item.get(key)
         if value not in (None, ''):
             return str(value)
     return None
 
 
-def fetch_all(path: str, item_keys: list[str]) -> list[dict[str, Any]]:
+def fetch_all(
+    path: str,
+    item_keys: list[str],
+    *,
+    stop_when: Callable[[dict[str, Any]], bool] | None = None,
+) -> list[dict[str, Any]]:
     _validate_config()
 
     base_url = settings.prom_api_base_url.rstrip('/')
@@ -94,13 +100,27 @@ def fetch_all(path: str, item_keys: list[str]) -> list[dict[str, Any]]:
             if not items:
                 break
 
+            stop_reached = False
+            if stop_when is not None:
+                filtered_items: list[dict[str, Any]] = []
+                for item in items:
+                    if stop_when(item):
+                        stop_reached = True
+                        break
+                    filtered_items.append(item)
+                items = filtered_items
+
+            if items:
+                all_items.extend(items)
+
+            if stop_reached:
+                break
+
             signature = tuple(str(item.get('id') or item.get('prom_uid') or item.get('uid') or '') for item in items[:5])
             if previous_signature is not None and signature == previous_signature and not cursor:
                 # Pagination params are likely ignored by upstream API, avoid infinite duplicates.
                 break
             previous_signature = signature
-
-            all_items.extend(items)
 
             next_cursor = _extract_cursor(payload)
             if not next_cursor and items:

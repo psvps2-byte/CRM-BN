@@ -138,7 +138,20 @@ def sync_products_from_prom(db: Session) -> int:
 
 
 def sync_orders_from_prom(db: Session) -> int:
-    remote_orders = fetch_all(settings.prom_orders_endpoint, ['orders', 'order_list'])
+    existing_order_uids = set(db.scalars(select(PromOrder.prom_uid)).all())
+
+    def stop_when_known_order(item: dict[str, Any]) -> bool:
+        prom_uid = _pick(item, ['id', 'order_id', 'number'])
+        if prom_uid is None:
+            return False
+        # Prom returns newest orders first, so the first known order means the rest are older.
+        return str(prom_uid).strip() in existing_order_uids
+
+    remote_orders = fetch_all(
+        settings.prom_orders_endpoint,
+        ['orders', 'order_list'],
+        stop_when=stop_when_known_order,
+    )
 
     synced = 0
     for item in remote_orders:
@@ -148,12 +161,12 @@ def sync_orders_from_prom(db: Session) -> int:
         prom_uid = str(prom_uid).strip()
         if not prom_uid:
             continue
+        if prom_uid in existing_order_uids:
+            continue
 
-        order = db.scalar(select(PromOrder).where(PromOrder.prom_uid == prom_uid))
-        if not order:
-            order = PromOrder(prom_uid=prom_uid)
-            db.add(order)
-            db.flush()
+        order = PromOrder(prom_uid=prom_uid)
+        db.add(order)
+        db.flush()
 
         customer = item.get('client') if isinstance(item.get('client'), dict) else {}
         first_name = str(customer.get('first_name') or '').strip()
