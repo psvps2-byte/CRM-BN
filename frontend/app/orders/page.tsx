@@ -8,8 +8,11 @@ import { useEffect, useState } from 'react';
 type OrderItem = {
   id: number;
   name: string;
+  sku?: string | null;
+  product_prom_uid?: string | null;
   quantity: number;
   price: number;
+  line_total: number;
 };
 
 type Order = {
@@ -18,17 +21,27 @@ type Order = {
   status: string;
   total_price: number;
   currency: string;
-  customer_name?: string;
-  customer_phone?: string;
+  customer_name?: string | null;
+  customer_phone?: string | null;
+  customer_email?: string | null;
+  payment_method?: string | null;
+  shipping_method?: string | null;
+  shipping_address?: string | null;
+  shipping_city?: string | null;
+  shipping_branch?: string | null;
+  comment?: string | null;
   created_at: string;
+  updated_at: string;
   items: OrderItem[];
 };
 
 export default function OrdersPage() {
   const router = useRouter();
   const [items, setItems] = useState<Order[]>([]);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   const load = async () => {
     setError('');
@@ -53,6 +66,35 @@ export default function OrdersPage() {
     }
   };
 
+  const saveOrder = async () => {
+    if (!selectedOrder) return;
+    setSaving(true);
+    setError('');
+    try {
+      const updated = await apiFetch(`/orders/${selectedOrder.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          status: selectedOrder.status,
+          customer_name: selectedOrder.customer_name || null,
+          customer_phone: selectedOrder.customer_phone || null,
+          customer_email: selectedOrder.customer_email || null,
+          payment_method: selectedOrder.payment_method || null,
+          shipping_method: selectedOrder.shipping_method || null,
+          shipping_address: selectedOrder.shipping_address || null,
+          shipping_city: selectedOrder.shipping_city || null,
+          shipping_branch: selectedOrder.shipping_branch || null,
+          comment: selectedOrder.comment || null
+        })
+      });
+      setItems((prev) => prev.map((order) => (order.id === updated.id ? updated : order)));
+      setSelectedOrder(updated);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Save failed');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   useEffect(() => {
     if (!requireAuth(router.push)) return;
     load();
@@ -63,8 +105,8 @@ export default function OrdersPage() {
     <main className="crm-layout">
       <CrmSidebar />
 
-      <section className="crm-content card">
-        <h1>Замовлення</h1>
+      <section className="crm-content orders-shell card">
+        <h1 style={{ marginTop: 0 }}>Замовлення</h1>
 
         <div className="row" style={{ marginBottom: 16 }}>
           <button onClick={syncOrders}>Синхронізувати замовлення з Prom</button>
@@ -77,39 +119,190 @@ export default function OrdersPage() {
         {loading ? (
           <p>Завантаження...</p>
         ) : (
-          <table>
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Prom UID</th>
-                <th>Клієнт</th>
-                <th>Статус</th>
-                <th>Сума</th>
-                <th>Позиції</th>
-                <th>Дата</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((order) => (
-                <tr key={order.id}>
-                  <td>{order.id}</td>
-                  <td>{order.prom_uid}</td>
-                  <td>
-                    {order.customer_name || '-'}
-                    {order.customer_phone ? ` (${order.customer_phone})` : ''}
-                  </td>
-                  <td>{order.status}</td>
-                  <td>
-                    {order.total_price} {order.currency}
-                  </td>
-                  <td>{order.items.map((i) => `${i.name} x${i.quantity}`).join(', ') || '-'}</td>
-                  <td>{new Date(order.created_at).toLocaleString()}</td>
+          <div className="orders-table-shell">
+            <table className="orders-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Замовлення</th>
+                  <th>Клієнт</th>
+                  <th>Статус</th>
+                  <th>Сума</th>
+                  <th>Дата</th>
+                  <th></th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {items.map((order) => (
+                  <tr key={order.id} onDoubleClick={() => setSelectedOrder(order)}>
+                    <td>{order.id}</td>
+                    <td>#{order.prom_uid}</td>
+                    <td>
+                      {order.customer_name || '-'}
+                      {order.customer_phone ? ` (${order.customer_phone})` : ''}
+                    </td>
+                    <td>{order.status}</td>
+                    <td>
+                      {order.total_price} {order.currency}
+                    </td>
+                    <td>{new Date(order.created_at).toLocaleString('uk-UA')}</td>
+                    <td>
+                      <button className="secondary small-btn" onClick={() => setSelectedOrder(order)}>
+                        Відкрити
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </section>
+
+      {selectedOrder && (
+        <div className="order-modal-backdrop" onClick={() => setSelectedOrder(null)}>
+          <div className="order-modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="order-modal-topbar">
+              <div className="order-modal-title">
+                Замовлення {selectedOrder.prom_uid} від {new Date(selectedOrder.created_at).toLocaleString('uk-UA')}
+              </div>
+              <button className="secondary" onClick={() => setSelectedOrder(null)}>
+                ✕
+              </button>
+            </div>
+
+            <div className="order-items-shell">
+              <table className="order-items-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: 52 }}>#</th>
+                    <th>Назва</th>
+                    <th>Артикул</th>
+                    <th>Кількість</th>
+                    <th>Ціна</th>
+                    <th>Сума</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {selectedOrder.items.map((item, index) => (
+                    <tr key={item.id}>
+                      <td>{index + 1}</td>
+                      <td>{item.name}</td>
+                      <td>{item.sku || item.product_prom_uid || '-'}</td>
+                      <td>{item.quantity}</td>
+                      <td>{item.price}</td>
+                      <td>{item.line_total}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td colSpan={3}></td>
+                    <td>{selectedOrder.items.reduce((sum, item) => sum + item.quantity, 0)}</td>
+                    <td></td>
+                    <td>{selectedOrder.total_price}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+
+            <div className="order-edit-layout">
+              <div className="order-section-title">Клієнт</div>
+              <div className="order-field-grid">
+                <label>Телефон</label>
+                <input
+                  value={selectedOrder.customer_phone || ''}
+                  onChange={(e) =>
+                    setSelectedOrder((prev) => (prev ? { ...prev, customer_phone: e.target.value } : prev))
+                  }
+                />
+
+                <label>Ім'я</label>
+                <input
+                  value={selectedOrder.customer_name || ''}
+                  onChange={(e) =>
+                    setSelectedOrder((prev) => (prev ? { ...prev, customer_name: e.target.value } : prev))
+                  }
+                />
+
+                <label>Email</label>
+                <input
+                  value={selectedOrder.customer_email || ''}
+                  onChange={(e) =>
+                    setSelectedOrder((prev) => (prev ? { ...prev, customer_email: e.target.value } : prev))
+                  }
+                />
+
+                <label>Статус</label>
+                <input
+                  value={selectedOrder.status}
+                  onChange={(e) => setSelectedOrder((prev) => (prev ? { ...prev, status: e.target.value } : prev))}
+                />
+              </div>
+
+              <div className="order-section-title">Оплата та доставка</div>
+              <div className="order-field-grid">
+                <label>Спосіб оплати</label>
+                <input
+                  value={selectedOrder.payment_method || ''}
+                  onChange={(e) =>
+                    setSelectedOrder((prev) => (prev ? { ...prev, payment_method: e.target.value } : prev))
+                  }
+                />
+
+                <label>Спосіб доставки</label>
+                <input
+                  value={selectedOrder.shipping_method || ''}
+                  onChange={(e) =>
+                    setSelectedOrder((prev) => (prev ? { ...prev, shipping_method: e.target.value } : prev))
+                  }
+                />
+
+                <label>Адреса доставки</label>
+                <input
+                  value={selectedOrder.shipping_address || ''}
+                  onChange={(e) =>
+                    setSelectedOrder((prev) => (prev ? { ...prev, shipping_address: e.target.value } : prev))
+                  }
+                />
+
+                <label>Місто</label>
+                <input
+                  value={selectedOrder.shipping_city || ''}
+                  onChange={(e) =>
+                    setSelectedOrder((prev) => (prev ? { ...prev, shipping_city: e.target.value } : prev))
+                  }
+                />
+
+                <label>Відділення</label>
+                <input
+                  value={selectedOrder.shipping_branch || ''}
+                  onChange={(e) =>
+                    setSelectedOrder((prev) => (prev ? { ...prev, shipping_branch: e.target.value } : prev))
+                  }
+                />
+              </div>
+
+              <div className="order-section-title">Коментар</div>
+              <textarea
+                rows={4}
+                value={selectedOrder.comment || ''}
+                onChange={(e) => setSelectedOrder((prev) => (prev ? { ...prev, comment: e.target.value } : prev))}
+                className="order-comment"
+              />
+            </div>
+
+            <div className="row" style={{ justifyContent: 'flex-end', marginTop: 14 }}>
+              <button className="secondary" onClick={() => setSelectedOrder(null)}>
+                Скасувати
+              </button>
+              <button onClick={saveOrder} disabled={saving}>
+                {saving ? 'Збереження...' : 'Зберегти'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

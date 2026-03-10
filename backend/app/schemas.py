@@ -105,6 +105,7 @@ class OrderItemOut(BaseModel):
     sku: str | None
     quantity: int
     price: float
+    line_total: float
 
 
 class OrderOut(BaseModel):
@@ -116,6 +117,12 @@ class OrderOut(BaseModel):
     customer_name: str | None
     customer_phone: str | None
     customer_email: str | None
+    payment_method: str | None
+    shipping_method: str | None
+    shipping_address: str | None
+    shipping_city: str | None
+    shipping_branch: str | None
+    comment: str | None
     created_at: datetime
     updated_at: datetime
     items: list[OrderItemOut]
@@ -126,3 +133,16 @@ class OrderListResponse(BaseModel):
     page: int
     per_page: int
     total: int
+
+
+class OrderUpdate(BaseModel):
+    status: str | None = Field(default=None, min_length=1, max_length=128)
+    customer_name: str | None = None
+    customer_phone: str | None = None
+    customer_email: str | None = None
+    payment_method: str | None = None
+    shipping_method: str | None = None
+    shipping_address: str | None = None
+    shipping_city: str | None = None
+    shipping_branch: str | None = None
+    comment: str | None = None
