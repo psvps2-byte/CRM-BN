@@ -5,7 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.models import Product, PromOrder, PromOrderItem
+from app.models import Product, ProductGroup, PromOrder, PromOrderItem
 from app.services.prom_api import fetch_all
 
 
@@ -71,8 +71,68 @@ def _normalize_image_urls(value: Any) -> list[str] | None:
     return None
 
 
+def _normalize_product_group(item: dict[str, Any]) -> tuple[str | None, str | None]:
+    group_payload = _pick(item, ['group', 'category', 'group_info', 'category_info'], None)
+    if isinstance(group_payload, dict):
+        group_uid = _pick(group_payload, ['id', 'uid', 'group_id', 'category_id'])
+        group_name = _pick(group_payload, ['name', 'title', 'group_name', 'category_name'])
+        return (
+            str(group_uid).strip() if group_uid not in (None, '') else None,
+            str(group_name).strip() if group_name not in (None, '') else None,
+        )
+
+    group_uid = _pick(item, ['group_id', 'category_id', 'group_uid', 'category_uid'])
+    group_name = _pick(item, ['group_name', 'category_name'])
+    return (
+        str(group_uid).strip() if group_uid not in (None, '') else None,
+        str(group_name).strip() if group_name not in (None, '') else None,
+    )
+
+
+def _get_or_create_group(
+    db: Session,
+    groups_by_uid: dict[str, ProductGroup],
+    groups_by_name: dict[str, ProductGroup],
+    group_uid: str | None,
+    group_name: str | None,
+) -> ProductGroup | None:
+    normalized_uid = group_uid.strip() if group_uid else None
+    normalized_name = group_name.strip() if group_name else None
+
+    group: ProductGroup | None = None
+    if normalized_uid:
+        group = groups_by_uid.get(normalized_uid)
+    if group is None and normalized_name:
+        group = groups_by_name.get(normalized_name.casefold())
+
+    if group is None and not normalized_uid and not normalized_name:
+        return None
+
+    if group is None:
+        group = ProductGroup(
+            prom_uid=normalized_uid,
+            name=normalized_name or normalized_uid or 'Без групи',
+        )
+        db.add(group)
+        db.flush()
+    else:
+        if normalized_uid and not group.prom_uid:
+            group.prom_uid = normalized_uid
+        if normalized_name and group.name != normalized_name:
+            group.name = normalized_name
+
+    if group.prom_uid:
+        groups_by_uid[group.prom_uid] = group
+    groups_by_name[group.name.casefold()] = group
+    return group
+
+
 def sync_products_from_prom(db: Session) -> int:
     remote_products = fetch_all(settings.prom_products_endpoint, ['products', 'product_list'])
+
+    groups = db.scalars(select(ProductGroup)).all()
+    groups_by_uid = {group.prom_uid: group for group in groups if group.prom_uid}
+    groups_by_name = {group.name.casefold(): group for group in groups if group.name}
 
     # Prom can return duplicate product IDs in one response. Keep only the latest row per UID.
     normalized_products: dict[str, dict[str, Any]] = {}
@@ -84,11 +144,15 @@ def sync_products_from_prom(db: Session) -> int:
         if not prom_uid:
             continue
 
+        group_uid, group_name = _normalize_product_group(item)
+        group = _get_or_create_group(db, groups_by_uid, groups_by_name, group_uid, group_name)
+
         normalized_products[prom_uid] = {
             'name': str(_pick(item, ['name', 'title'], prom_uid)).strip(),
             'price': _to_decimal(_pick(item, ['price', 'price_selling', 'price_with_discount'], 0)),
             'qty': max(0, _to_int(_pick(item, ['quantity_in_stock', 'quantity', 'stock'], 0))),
             'availability': str(_pick(item, ['presence', 'status', 'availability'], 'available')).strip() or 'available',
+            'group_id': group.id if group else None,
             'slug': str(_pick(item, ['url', 'slug'], '')).strip() or None,
             'description': str(_pick(item, ['description', 'content', 'short_description'], '')).strip() or None,
             'attributes': _normalize_attributes(_pick(item, ['attributes', 'characteristics'], None)),
@@ -109,6 +173,8 @@ def sync_products_from_prom(db: Session) -> int:
             product.price = payload['price']
             product.qty = payload['qty']
             product.availability = payload['availability']
+            if payload['group_id'] is not None:
+                product.group_id = payload['group_id']
             if payload['slug']:
                 product.slug = payload['slug']
             if payload['description']:
@@ -125,6 +191,7 @@ def sync_products_from_prom(db: Session) -> int:
                     price=payload['price'],
                     qty=payload['qty'],
                     availability=payload['availability'],
+                    group_id=payload['group_id'],
                     slug=payload['slug'],
                     description=payload['description'],
                     attributes=payload['attributes'],
