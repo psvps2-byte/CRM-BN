@@ -5,6 +5,42 @@ import { apiFetch, requireAuth } from '@/lib/api';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
+const ORDER_STATUS_OPTIONS = [
+  'Розпочато',
+  'Прийняте',
+  'Не дозвон',
+  'Очікування оплати',
+  'Оплачений',
+  'Очікує ТТН',
+  'Очікує відправки',
+  'Очікування відповіді Вайбер',
+  'Скасоване',
+  'Завершене'
+] as const;
+
+const ORDER_STATUS_LABELS: Record<string, string> = {
+  new: 'Розпочато',
+  pending: 'Розпочато',
+  processing: 'Прийняте',
+  accepted: 'Прийняте',
+  received: 'Прийняте',
+  not_called: 'Не дозвон',
+  pending_payment: 'Очікування оплати',
+  awaiting_payment: 'Очікування оплати',
+  paid: 'Оплачений',
+  ttn_pending: 'Очікує ТТН',
+  awaiting_ttn: 'Очікує ТТН',
+  shipping_pending: 'Очікує відправки',
+  awaiting_shipping: 'Очікує відправки',
+  viber_pending: 'Очікування відповіді Вайбер',
+  awaiting_viber_reply: 'Очікування відповіді Вайбер',
+  cancelled: 'Скасоване',
+  canceled: 'Скасоване',
+  done: 'Завершене',
+  completed: 'Завершене',
+  delivered: 'Завершене'
+};
+
 type OrderItem = {
   id: number;
   name: string;
@@ -34,6 +70,10 @@ type Order = {
   updated_at: string;
   items: OrderItem[];
 };
+
+function displayOrderStatus(status: string) {
+  return ORDER_STATUS_LABELS[status.trim().toLowerCase()] || status;
+}
 
 export default function OrdersPage() {
   const router = useRouter();
@@ -141,7 +181,7 @@ export default function OrdersPage() {
                       {order.customer_name || '-'}
                       {order.customer_phone ? ` (${order.customer_phone})` : ''}
                     </td>
-                    <td>{order.status}</td>
+                    <td>{displayOrderStatus(order.status)}</td>
                     <td>
                       {order.total_price} {order.currency}
                     </td>
@@ -234,10 +274,16 @@ export default function OrdersPage() {
                 />
 
                 <label>Статус</label>
-                <input
-                  value={selectedOrder.status}
+                <select
+                  value={displayOrderStatus(selectedOrder.status)}
                   onChange={(e) => setSelectedOrder((prev) => (prev ? { ...prev, status: e.target.value } : prev))}
-                />
+                >
+                  {ORDER_STATUS_OPTIONS.map((status) => (
+                    <option key={status} value={status}>
+                      {status}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="order-section-title">Оплата та доставка</div>

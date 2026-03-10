@@ -8,6 +8,29 @@ from app.config import settings
 from app.models import Product, ProductGroup, PromOrder, PromOrderItem
 from app.services.prom_api import fetch_all
 
+ORDER_STATUS_MAP = {
+    'new': 'Розпочато',
+    'pending': 'Розпочато',
+    'processing': 'Прийняте',
+    'accepted': 'Прийняте',
+    'received': 'Прийняте',
+    'not_called': 'Не дозвон',
+    'pending_payment': 'Очікування оплати',
+    'awaiting_payment': 'Очікування оплати',
+    'paid': 'Оплачений',
+    'ttn_pending': 'Очікує ТТН',
+    'awaiting_ttn': 'Очікує ТТН',
+    'shipping_pending': 'Очікує відправки',
+    'awaiting_shipping': 'Очікує відправки',
+    'viber_pending': 'Очікування відповіді Вайбер',
+    'awaiting_viber_reply': 'Очікування відповіді Вайбер',
+    'cancelled': 'Скасоване',
+    'canceled': 'Скасоване',
+    'done': 'Завершене',
+    'completed': 'Завершене',
+    'delivered': 'Завершене',
+}
+
 
 def _to_decimal(value: Any, default: str = '0') -> Decimal:
     if value is None or value == '':
@@ -32,6 +55,13 @@ def _pick(data: dict[str, Any], keys: list[str], fallback: Any = None) -> Any:
         if key in data and data[key] not in (None, ''):
             return data[key]
     return fallback
+
+
+def _normalize_order_status(value: Any) -> str:
+    raw = str(value or '').strip()
+    if not raw:
+        return 'Розпочато'
+    return ORDER_STATUS_MAP.get(raw.casefold(), raw)
 
 
 def _normalize_attributes(value: Any) -> dict[str, str] | None:
@@ -240,7 +270,7 @@ def sync_orders_from_prom(db: Session) -> int:
         last_name = str(customer.get('last_name') or '').strip()
         full_name = ' '.join(part for part in [first_name, last_name] if part).strip() or None
 
-        order.status = str(_pick(item, ['status', 'state'], 'new'))
+        order.status = _normalize_order_status(_pick(item, ['status', 'state'], 'new'))
         order.total_price = _to_decimal(_pick(item, ['price', 'total_price', 'amount'], 0))
         order.currency = str(_pick(item, ['currency', 'currency_code'], 'UAH'))
         order.customer_name = full_name or str(_pick(item, ['client_name', 'full_name'], '')) or None
