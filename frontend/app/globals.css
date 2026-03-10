@@ -337,6 +337,10 @@ nav {
   background: #f8fbff;
 }
 
+.order-list-row {
+  cursor: pointer;
+}
+
 .order-row-actions {
   display: flex;
   justify-content: flex-end;

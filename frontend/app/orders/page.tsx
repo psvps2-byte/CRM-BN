@@ -229,7 +229,7 @@ export default function OrdersPage() {
               </thead>
               <tbody>
                 {visibleOrders.map((order) => (
-                  <tr key={order.id} onDoubleClick={() => setSelectedOrder(order)}>
+                  <tr key={order.id} onClick={() => setSelectedOrder(order)} className="order-list-row">
                     <td>{order.id}</td>
                     <td>#{order.prom_uid}</td>
                     <td>
@@ -256,9 +256,6 @@ export default function OrdersPage() {
                             </option>
                           ))}
                         </select>
-                        <button className="secondary small-btn" onClick={() => setSelectedOrder(order)}>
-                          Відкрити
-                        </button>
                       </div>
                     </td>
                   </tr>

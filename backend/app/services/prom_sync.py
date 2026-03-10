@@ -64,6 +64,26 @@ def _normalize_order_status(value: Any) -> str:
     return ORDER_STATUS_MAP.get(raw.casefold(), raw)
 
 
+def _extract_order_total(item: dict[str, Any]) -> Decimal:
+    return _to_decimal(
+        _pick(
+            item,
+            ['price', 'total_price', 'amount', 'sum', 'full_price', 'amount_with_discount'],
+            0,
+        )
+    )
+
+
+def _extract_order_item_price(item: dict[str, Any]) -> Decimal:
+    return _to_decimal(
+        _pick(
+            item,
+            ['price', 'price_selling', 'full_price', 'amount', 'total_price', 'cost'],
+            0,
+        )
+    )
+
+
 def _normalize_attributes(value: Any) -> dict[str, str] | None:
     if isinstance(value, dict):
         result = {str(key).strip(): str(item).strip() for key, item in value.items() if str(key).strip()}
@@ -235,14 +255,22 @@ def sync_products_from_prom(db: Session) -> int:
 
 
 def sync_orders_from_prom(db: Session) -> int:
-    existing_order_uids = set(db.scalars(select(PromOrder.prom_uid)).all())
+    existing_orders = db.scalars(select(PromOrder)).all()
+    existing_orders_by_uid = {order.prom_uid: order for order in existing_orders}
 
     def stop_when_known_order(item: dict[str, Any]) -> bool:
         prom_uid = _pick(item, ['id', 'order_id', 'number'])
         if prom_uid is None:
             return False
+        existing_order = existing_orders_by_uid.get(str(prom_uid).strip())
+        if existing_order is None:
+            return False
+        if float(existing_order.total_price or 0) <= 0:
+            return False
+        if not existing_order.items:
+            return False
         # Prom returns newest orders first, so the first known order means the rest are older.
-        return str(prom_uid).strip() in existing_order_uids
+        return True
 
     remote_orders = fetch_all(
         settings.prom_orders_endpoint,
@@ -258,12 +286,13 @@ def sync_orders_from_prom(db: Session) -> int:
         prom_uid = str(prom_uid).strip()
         if not prom_uid:
             continue
-        if prom_uid in existing_order_uids:
-            continue
-
-        order = PromOrder(prom_uid=prom_uid)
-        db.add(order)
-        db.flush()
+        order = existing_orders_by_uid.get(prom_uid)
+        is_new_order = order is None
+        if order is None:
+            order = PromOrder(prom_uid=prom_uid)
+            db.add(order)
+            db.flush()
+            existing_orders_by_uid[prom_uid] = order
 
         customer = item.get('client') if isinstance(item.get('client'), dict) else {}
         first_name = str(customer.get('first_name') or '').strip()
@@ -271,7 +300,6 @@ def sync_orders_from_prom(db: Session) -> int:
         full_name = ' '.join(part for part in [first_name, last_name] if part).strip() or None
 
         order.status = _normalize_order_status(_pick(item, ['status', 'state'], 'new'))
-        order.total_price = _to_decimal(_pick(item, ['price', 'total_price', 'amount'], 0))
         order.currency = str(_pick(item, ['currency', 'currency_code'], 'UAH'))
         order.customer_name = full_name or str(_pick(item, ['client_name', 'full_name'], '')) or None
         order.customer_phone = str(_pick(customer, ['phone', 'phone_number'], _pick(item, ['phone'], ''))) or None
@@ -279,6 +307,7 @@ def sync_orders_from_prom(db: Session) -> int:
         order.raw_payload = item
 
         order.items.clear()
+        computed_total = Decimal('0')
         raw_items = item.get('products') or item.get('items') or []
         if isinstance(raw_items, list):
             for raw in raw_items:
@@ -291,18 +320,26 @@ def sync_orders_from_prom(db: Session) -> int:
                 if product_uid:
                     linked_product = db.scalar(select(Product).where(Product.prom_uid == product_uid))
 
+                quantity = max(1, _to_int(_pick(raw, ['quantity', 'count'], 1), 1))
+                price = _extract_order_item_price(raw)
+                computed_total += price * quantity
+
                 order.items.append(
                     PromOrderItem(
                         product_id=linked_product.id if linked_product else None,
                         product_prom_uid=product_uid,
                         name=str(_pick(raw, ['name', 'title'], 'Item')),
                         sku=str(_pick(raw, ['sku'], '')) or None,
-                        quantity=max(1, _to_int(_pick(raw, ['quantity', 'count'], 1), 1)),
-                        price=_to_decimal(_pick(raw, ['price', 'price_selling'], 0)),
+                        quantity=quantity,
+                        price=price,
                     )
                 )
 
-        synced += 1
+        extracted_total = _extract_order_total(item)
+        order.total_price = extracted_total if extracted_total > 0 else computed_total
+
+        if is_new_order:
+            synced += 1
 
     db.commit()
     return synced
