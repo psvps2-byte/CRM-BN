@@ -1,4 +1,5 @@
 from collections.abc import Callable
+import time
 from typing import Any
 
 import httpx
@@ -54,6 +55,48 @@ def _extract_item_id(item: dict[str, Any]) -> str | None:
     return None
 
 
+def _fetch_with_retry(
+    client: httpx.Client,
+    url: str,
+    headers: dict[str, str],
+    params: dict[str, Any],
+) -> httpx.Response:
+    last_error: Exception | None = None
+    attempts = max(1, settings.prom_retry_attempts)
+
+    for attempt in range(1, attempts + 1):
+        try:
+            response = client.get(url, headers=headers, params=params)
+            if response.status_code < 500:
+                return response
+            detail = f'Prom API error {response.status_code}'
+            try:
+                payload = response.json()
+                if isinstance(payload, dict) and payload.get('message'):
+                    detail = str(payload['message'])
+            except Exception:
+                pass
+            last_error = HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=detail,
+            )
+        except httpx.TimeoutException as exc:
+            last_error = exc
+        except httpx.HTTPError as exc:
+            last_error = exc
+
+        if attempt < attempts:
+            time.sleep(settings.prom_retry_backoff_seconds * attempt)
+
+    if isinstance(last_error, HTTPException):
+        raise last_error
+
+    raise HTTPException(
+        status_code=status.HTTP_502_BAD_GATEWAY,
+        detail='Prom API request failed after retries',
+    ) from last_error
+
+
 def fetch_all(
     path: str,
     item_keys: list[str],
@@ -69,7 +112,7 @@ def fetch_all(
     headers = {'Authorization': f'Bearer {settings.prom_api_token}'}
     all_items: list[dict[str, Any]] = []
 
-    with httpx.Client(timeout=30.0) as client:
+    with httpx.Client(timeout=settings.prom_request_timeout) as client:
         cursor: str | None = None
         page = 1
         previous_signature: tuple[str, ...] | None = None
@@ -84,7 +127,7 @@ def fetch_all(
             else:
                 params['page'] = page
 
-            response = client.get(url, headers=headers, params=params)
+            response = _fetch_with_retry(client, url, headers, params)
             if response.status_code >= 400:
                 detail = f'Prom API error {response.status_code}'
                 try:

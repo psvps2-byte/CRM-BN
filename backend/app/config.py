@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     prom_orders_endpoint: str = '/orders/list'
     prom_page_size: int = 100
     prom_max_pages: int = 50
+    prom_request_timeout: float = 30.0
+    prom_retry_attempts: int = 3
+    prom_retry_backoff_seconds: float = 2.0
 
     r2_account_id: str | None = None
     r2_access_key_id: str | None = None

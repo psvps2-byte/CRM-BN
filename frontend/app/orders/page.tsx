@@ -79,9 +79,11 @@ export default function OrdersPage() {
   const router = useRouter();
   const [items, setItems] = useState<Order[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [activeStatus, setActiveStatus] = useState<string>('Всі');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [updatingOrderId, setUpdatingOrderId] = useState<number | null>(null);
 
   const load = async () => {
     setError('');
@@ -135,11 +137,44 @@ export default function OrdersPage() {
     }
   };
 
+  const updateOrderStatus = async (orderId: number, status: string) => {
+    setUpdatingOrderId(orderId);
+    setError('');
+    try {
+      const updated = await apiFetch(`/orders/${orderId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status })
+      });
+      setItems((prev) => prev.map((order) => (order.id === updated.id ? updated : order)));
+      setSelectedOrder((prev) => (prev && prev.id === updated.id ? updated : prev));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Status update failed');
+    } finally {
+      setUpdatingOrderId(null);
+    }
+  };
+
   useEffect(() => {
     if (!requireAuth(router.push)) return;
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const statusCounts = ORDER_STATUS_OPTIONS.reduce<Record<string, number>>((acc, status) => {
+    acc[status] = 0;
+    return acc;
+  }, {});
+
+  for (const order of items) {
+    const normalizedStatus = displayOrderStatus(order.status);
+    if (normalizedStatus in statusCounts) {
+      statusCounts[normalizedStatus] += 1;
+    }
+  }
+
+  const visibleOrders = activeStatus === 'Всі'
+    ? items
+    : items.filter((order) => displayOrderStatus(order.status) === activeStatus);
 
   return (
     <main className="crm-layout">
@@ -153,6 +188,26 @@ export default function OrdersPage() {
           <button className="secondary" onClick={load}>
             Оновити список
           </button>
+        </div>
+
+        <div className="order-status-tabs">
+          <button
+            className={activeStatus === 'Всі' ? 'order-status-tab active' : 'order-status-tab'}
+            onClick={() => setActiveStatus('Всі')}
+          >
+            Всі
+            <span className="order-status-count">{items.length}</span>
+          </button>
+          {ORDER_STATUS_OPTIONS.map((status) => (
+            <button
+              key={status}
+              className={activeStatus === status ? 'order-status-tab active' : 'order-status-tab'}
+              onClick={() => setActiveStatus(status)}
+            >
+              {status}
+              <span className="order-status-count">{statusCounts[status]}</span>
+            </button>
+          ))}
         </div>
 
         {error && <p className="error">{error}</p>}
@@ -169,11 +224,11 @@ export default function OrdersPage() {
                   <th>Статус</th>
                   <th>Сума</th>
                   <th>Дата</th>
-                  <th></th>
+                  <th style={{ width: 180 }}></th>
                 </tr>
               </thead>
               <tbody>
-                {items.map((order) => (
+                {visibleOrders.map((order) => (
                   <tr key={order.id} onDoubleClick={() => setSelectedOrder(order)}>
                     <td>{order.id}</td>
                     <td>#{order.prom_uid}</td>
@@ -187,9 +242,24 @@ export default function OrdersPage() {
                     </td>
                     <td>{new Date(order.created_at).toLocaleString('uk-UA')}</td>
                     <td>
-                      <button className="secondary small-btn" onClick={() => setSelectedOrder(order)}>
-                        Відкрити
-                      </button>
+                      <div className="order-row-actions">
+                        <select
+                          value={displayOrderStatus(order.status)}
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={(e) => updateOrderStatus(order.id, e.target.value)}
+                          disabled={updatingOrderId === order.id}
+                          className="order-row-status"
+                        >
+                          {ORDER_STATUS_OPTIONS.map((status) => (
+                            <option key={status} value={status}>
+                              {status}
+                            </option>
+                          ))}
+                        </select>
+                        <button className="secondary small-btn" onClick={() => setSelectedOrder(order)}>
+                          Відкрити
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
