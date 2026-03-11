@@ -97,6 +97,11 @@ class SyncAllResult(BaseModel):
     orders_synced: int
 
 
+class SyncTriggerResult(BaseModel):
+    started: bool
+    message: str
+
+
 class OrderItemOut(BaseModel):
     id: int
     product_id: int | None
