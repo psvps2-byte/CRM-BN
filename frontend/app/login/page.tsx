@@ -2,7 +2,7 @@
 
 import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { API_URL } from '@/lib/api';
+import { API_URL, setToken } from '@/lib/api';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -25,7 +25,7 @@ export default function LoginPage() {
       if (!res.ok) {
         throw new Error(data.detail || 'Login failed');
       }
-      localStorage.setItem('token', data.access_token);
+      setToken(data.access_token);
       router.push('/products');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');

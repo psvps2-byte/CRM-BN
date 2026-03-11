@@ -1,7 +1,8 @@
 'use client';
 
+import { clearToken } from '@/lib/api';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 
 const NAV_ITEMS = [
   { href: '/orders', label: 'Замовлення' },
@@ -11,6 +12,7 @@ const NAV_ITEMS = [
 
 export default function CrmSidebar() {
   const pathname = usePathname();
+  const router = useRouter();
 
   return (
     <aside className="crm-sidebar">
@@ -27,6 +29,18 @@ export default function CrmSidebar() {
           </Link>
         ))}
       </nav>
+      <div className="crm-sidebar-footer">
+        <button
+          type="button"
+          className="crm-logout-btn"
+          onClick={() => {
+            clearToken();
+            router.push('/login');
+          }}
+        >
+          Вийти
+        </button>
+      </div>
     </aside>
   );
 }

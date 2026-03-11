@@ -2,9 +2,21 @@ const API_URL =
   process.env.NEXT_PUBLIC_API_URL ||
   'https://backend-production-c878.up.railway.app';
 
+const TOKEN_KEY = 'token';
+
 export function getToken(): string | null {
   if (typeof window === 'undefined') return null;
-  return localStorage.getItem('token');
+  return localStorage.getItem(TOKEN_KEY);
+}
+
+export function setToken(token: string) {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(TOKEN_KEY, token);
+}
+
+export function clearToken() {
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem(TOKEN_KEY);
 }
 
 export async function apiFetch(path: string, options: RequestInit = {}) {
@@ -30,6 +42,12 @@ export async function apiFetch(path: string, options: RequestInit = {}) {
       message = data.detail || message;
     } catch {
       // no-op
+    }
+    if (res.status === 401) {
+      clearToken();
+      if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
     }
     throw new Error(message);
   }

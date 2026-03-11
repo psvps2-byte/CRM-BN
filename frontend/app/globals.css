@@ -51,6 +51,22 @@ body {
   display: block;
 }
 
+.crm-sidebar-footer {
+  margin-top: 16px;
+  padding: 0 14px;
+}
+
+.crm-logout-btn {
+  width: 100%;
+  background: #dbe7f3;
+  color: #234e74;
+  border: 1px solid #b7cde3;
+}
+
+.crm-logout-btn:hover {
+  background: #cfe0ef;
+}
+
 .crm-menu-link {
   display: block;
   padding: 8px 14px;
